@@ -1,4 +1,3 @@
-import pydantic
 from pydantic import BaseModel
 from typing import List
 
@@ -9,6 +8,7 @@ class NextMatchGame(BaseModel):
     best_network_sha: str
     candidate_sha: str
     parameters: List[str]
+    candidate_turns_first: bool
 
 
 class NextTrainingGame(BaseModel):
