@@ -5,6 +5,8 @@ import pydantic
 import gzip
 
 
+# TODO сделать так, чтобы не приходилось каждый раз писать обработку ошибки со стороны сервера
+
 def next_game(username, password):
     params = {'username': username, 'password': password}
 
@@ -16,7 +18,7 @@ def next_game(username, password):
 
     try:
         error = RequestError(**data)
-        raise Exception
+        raise Exception(error.error)
     except pydantic.ValidationError as e:
         pass
 
@@ -44,35 +46,55 @@ def download_network(sha):
         raise Exception
 
 
-def upload_match_game(match_file_path, match_game_id, result):
-    with open(match_file_path, 'r') as f:
-        data = {
-            'match_game_id': match_game_id,
-            'result': result,
-            'match_game_file': (None, f)
-        }
-
-    try:
-        # да, это странновато, что чтобы послать multipart, нужно указать параметр files,
-        # в котором как раз и будет словарь
-        response = requests.post(config.SERVER_URL + '/upload_match_game', files=data)
-    except:
-        raise Exception
-
-
-def upload_training_game(training_example_path, training_game_sgf_path, training_run_id, network_id):
+def upload_match_game(username, password, match_file_path, match_game_id, result):
     data = {
-        'training_run_id': training_run_id,
-        'network_id': network_id
+        'match_game_id': match_game_id,
+        'result': result,
+        'username': username,
+        'password': password
     }
 
-    with open(training_example_path, 'rb') as f:
-        data['training_example'] = f
+    sgf_file = open(match_file_path, 'r')
 
-    with open(training_game_sgf_path, 'rb') as f:
-        data['training_game_sgf'] = f
+    files = {'match_game_sgf': sgf_file}
 
     try:
-        response = requests.post(config.SERVER_URL + '/upload_training_game', files=data)
+        response = requests.post(config.SERVER_URL + '/upload_match_game', data=data, files=files)
     except:
         raise Exception
+    finally:
+        sgf_file.close()
+
+
+def upload_training_game(username, password, training_game_sgf_path, training_example_path,
+                         training_run_id, network_id):
+    data = {
+        'training_run_id': training_run_id,
+        'network_id': network_id,
+        'username': username,
+        'password': password
+    }
+
+    sgf_file = open(training_game_sgf_path, 'r')
+    example_file = open(training_example_path, 'rb')
+
+    # TODO send example in gzip format
+    files = {
+        'training_game_sgf': sgf_file,
+        'training_example': example_file
+    }
+
+    try:
+        response = requests.post(config.SERVER_URL + '/upload_training_game', data=data, files=files)
+        data = response.json()
+    except:
+        raise Exception
+    finally:
+        sgf_file.close()
+        example_file.close()
+
+    try:
+        error = RequestError(**data)
+        raise Exception(error.error)
+    except pydantic.ValidationError as e:
+        pass

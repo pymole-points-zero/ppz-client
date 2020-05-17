@@ -59,8 +59,7 @@ else:
 if not config.NETWORKS_FOLDER.exists():
     config.NETWORKS_FOLDER.mkdir()
 
-
-# главный цикл
+# main loop
 while True:
     try:
         options.next_game = networking.next_game(username, password)
@@ -69,7 +68,8 @@ while True:
 
     print(options.next_game)
 
-    # загружаем нейронные сети
+    # TODO keep network for a while (caching)
+    # download neural networks
     networking.download_network(options.next_game.best_network_sha)
 
     if options.next_game.game_type == 'match':
@@ -81,7 +81,7 @@ while True:
             'match',
             '--best_weights', str(config.NETWORKS_FOLDER / (options.next_game.best_network_sha + '.h5')),
             '--candidate_weights', str(config.NETWORKS_FOLDER / (options.next_game.candidate_sha + '.h5')),
-            '--match_parameters', str(options.next_game.parameters),
+            '--parameters', str(options.next_game.parameters),
         ]
 
         if options.next_game.candidate_turns_first:
@@ -90,28 +90,32 @@ while True:
         # ждем, пока отыграется матч
         engine_process = subprocess.Popen(process_args, shell=True, stdout=subprocess.PIPE)
         output, err = engine_process.communicate()
+        output = output.decode('utf-8')
+
+        print(output)
 
         # получаем путь к файлу матча и результат
-        match_file_path, result = str(output).split('\n')
+        match_file_path, result = output.split()
 
         # отправляем результат отыгранного матча
-        networking.upload_match_game(match_file_path, options.next_game.match_game_id, int(result))
+        networking.upload_match_game(username, password, match_file_path, options.next_game.match_game_id, int(result))
 
     elif options.next_game.game_type == 'train':
-        print(str(config.NETWORKS_FOLDER / options.next_game.best_network_sha))
         process_args = [
             str(config.VENV_PATH),
             str(config.ENGINE_MAIN_PATH),
             'selfplay',
-            '--best_weights', str(config.NETWORKS_FOLDER / (options.next_game.best_network_sha + '.h5')),
-            '--training_parameters', str(options.next_game.parameters),
+            '--weights', str(config.NETWORKS_FOLDER / (options.next_game.best_network_sha + '.h5')),
+            '--parameters', str(options.next_game.parameters),
         ]
 
         # ждем, пока проведется игра нейронной сети с самой собой
         engine_process = subprocess.Popen(process_args, shell=True, stdout=subprocess.PIPE)
         output, err = engine_process.communicate()
+        output = output.decode('utf-8')
+        print(output)
+        # TODO remove training_example_path
+        training_game_sgf_path, training_example_path = output.split()
 
-        training_game_sgf_path, training_example_path = str(output).split('\n')
-
-        networking.upload_training_game(training_example_path, training_game_sgf_path,
+        networking.upload_training_game(username, password, training_game_sgf_path, training_example_path,
                                         options.next_game.training_run_id, options.next_game.network_id)

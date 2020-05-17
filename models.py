@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import Dict
 
 
 class NextMatchGame(BaseModel):
@@ -7,7 +7,7 @@ class NextMatchGame(BaseModel):
     match_game_id: int
     best_network_sha: str
     candidate_sha: str
-    parameters: List[str]
+    parameters: Dict
     candidate_turns_first: bool
 
 
@@ -16,7 +16,7 @@ class NextTrainingGame(BaseModel):
     training_run_id: int
     network_id: int
     best_network_sha: str
-    parameters: List[str]
+    parameters: Dict
     keep_time: int
 
 
