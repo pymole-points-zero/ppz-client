@@ -114,7 +114,7 @@ while True:
         output, err = engine_process.communicate()
         output = output.decode('utf-8')
         print(output)
-        # TODO remove training_example_path
+
         training_game_sgf_path, training_example_path = output.split()
 
         networking.upload_training_game(username, password, training_game_sgf_path, training_example_path,

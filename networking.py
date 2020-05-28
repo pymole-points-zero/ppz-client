@@ -76,9 +76,8 @@ def upload_training_game(username, password, training_game_sgf_path, training_ex
     }
 
     sgf_file = open(training_game_sgf_path, 'r')
-    example_file = open(training_example_path, 'rb')
+    example_file = open(training_example_path, 'r')
 
-    # TODO send example in gzip format
     files = {
         'training_game_sgf': sgf_file,
         'training_example': example_file
