@@ -6,6 +6,7 @@ import options
 import config
 import subprocess
 import time
+import argparse
 
 
 def create_credentials():
@@ -32,6 +33,14 @@ def yes_or_no(question):
         print('Input y or n: ', end='')
 
 
+# TODO временная мера, чтобы менять адрес сервера
+parser = argparse.ArgumentParser()
+parser.add_argument('--server', type=str, help='Server address', required=False)
+
+args = parser.parse_args()
+
+if args.server is not None:
+    config.SERVER_URL = args.server
 # получаем логин и пароль пользователя
 
 # проверяем файл данных пользователя
