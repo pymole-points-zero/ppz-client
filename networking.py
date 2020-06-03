@@ -76,7 +76,7 @@ def upload_training_game(username, password, training_game_sgf_path, training_ex
     }
 
     sgf_file = open(training_game_sgf_path, 'r')
-    example_file = open(training_example_path, 'r')
+    example_file = open(training_example_path, 'rb')
 
     files = {
         'training_game_sgf': sgf_file,

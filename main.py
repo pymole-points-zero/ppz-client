@@ -1,11 +1,11 @@
 import json
 import sys
-
 import networking
 from config import CREDENTIALS_PATH
 import options
 import config
 import subprocess
+import time
 
 
 def create_credentials():
@@ -59,11 +59,13 @@ else:
 if not config.NETWORKS_FOLDER.exists():
     config.NETWORKS_FOLDER.mkdir()
 
+# TODO silent shutdown ctrl + C
 # main loop
 while True:
     try:
         options.next_game = networking.next_game(username, password)
-    except Exception:
+    except Exception as e:
+        print(e)
         break
 
     print(options.next_game)
@@ -71,50 +73,64 @@ while True:
     # TODO keep network for a while (caching)
     # download neural networks
     networking.download_network(options.next_game.best_network_sha)
-
     if options.next_game.game_type == 'match':
         networking.download_network(options.next_game.candidate_sha)
-
-        process_args = [
+        command_args = [
             str(config.VENV_PATH),
             str(config.ENGINE_MAIN_PATH),
             'match',
+            '--field_width', str(options.next_game.field_width),
+            '--field_height', str(options.next_game.field_height),
+        ] + options.next_game.parameters + [
             '--best_weights', str(config.NETWORKS_FOLDER / (options.next_game.best_network_sha + '.h5')),
             '--candidate_weights', str(config.NETWORKS_FOLDER / (options.next_game.candidate_sha + '.h5')),
-            '--parameters', str(options.next_game.parameters),
         ]
 
         if options.next_game.candidate_turns_first:
-            process_args.append('--candidate_turns_first')
+            command_args.append('--candidate_turns_first')
+
+        command_line = ' '.join(command_args)
 
         # ждем, пока отыграется матч
-        engine_process = subprocess.Popen(process_args, shell=True, stdout=subprocess.PIPE)
+        start_time = time.time()
+        engine_process = subprocess.Popen(command_line, shell=True, stdout=subprocess.PIPE)
         output, err = engine_process.communicate()
         output = output.decode('utf-8')
 
         print(output)
-
+        # TODO error handling when engine fails
         # получаем путь к файлу матча и результат
         match_file_path, result = output.split()
+
+        print('Match ended in', time.time() - start_time)
 
         # отправляем результат отыгранного матча
         networking.upload_match_game(username, password, match_file_path, options.next_game.match_game_id, int(result))
 
     elif options.next_game.game_type == 'train':
-        process_args = [
+        command_args = [
             str(config.VENV_PATH),
             str(config.ENGINE_MAIN_PATH),
             'selfplay',
+            '--field_width', str(options.next_game.field_width),
+            '--field_height', str(options.next_game.field_height),
+        ] + options.next_game.parameters + [
             '--weights', str(config.NETWORKS_FOLDER / (options.next_game.best_network_sha + '.h5')),
-            '--parameters', str(options.next_game.parameters),
         ]
+        command_line = ' '.join(command_args)
+        print(command_line)
+
+        start_time = time.time()
 
         # ждем, пока проведется игра нейронной сети с самой собой
-        engine_process = subprocess.Popen(process_args, shell=True, stdout=subprocess.PIPE)
+        engine_process = subprocess.Popen(command_line, shell=True, stdout=subprocess.PIPE)
         output, err = engine_process.communicate()
         output = output.decode('utf-8')
         print(output)
 
+        print('Selfplay ended in', time.time() - start_time)
+
+        # TODO error handling when engine fails
         training_game_sgf_path, training_example_path = output.split()
 
         networking.upload_training_game(username, password, training_game_sgf_path, training_example_path,
