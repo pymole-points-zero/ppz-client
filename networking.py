@@ -1,18 +1,38 @@
 import requests
+from requests.packages.urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 import config
 from models import NextMatchGame, NextTrainingGame, RequestError
 import pydantic
 import gzip
-import os
+
+
+retry_strategy = Retry(
+    total=5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    method_whitelist=["GET", "POST"],
+    backoff_factor=10
+)
+
+adapter = HTTPAdapter(max_retries=retry_strategy)
 
 
 # TODO сделать так, чтобы не приходилось каждый раз писать обработку ошибки со стороны сервера
 
+def prepare_session():
+    s = requests.Session()
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+
+    return s
+
+
 def next_game(username, password):
+    session = prepare_session()
     params = {'username': username, 'password': password}
 
     try:
-        response = requests.post(config.SERVER_URL + '/next_game', json=params)
+        response = session.post(config.SERVER_URL + '/next_game', json=params)
         data = response.json()
     except ValueError:
         raise Exception
@@ -37,6 +57,7 @@ def next_game(username, password):
 
 
 def download_network(sha):
+    session = prepare_session()
     # check if cached
     network_path = config.NETWORKS_FOLDER / (sha + '.h5')
     if network_path.exists():
@@ -46,7 +67,7 @@ def download_network(sha):
     params = {'sha': sha}
 
     try:
-        response = requests.get(config.SERVER_URL + '/download_network', json=params)
+        response = session.get(config.SERVER_URL + '/download_network', json=params)
         with open(network_path, 'wb') as f:
             f.write(gzip.decompress(response.content))
     except:
@@ -54,6 +75,7 @@ def download_network(sha):
 
 
 def upload_match_game(username, password, match_file_path, match_game_id, result):
+    session = prepare_session()
     data = {
         'match_game_id': match_game_id,
         'result': result,
@@ -66,7 +88,7 @@ def upload_match_game(username, password, match_file_path, match_game_id, result
     files = {'match_game_sgf': sgf_file}
 
     try:
-        response = requests.post(config.SERVER_URL + '/upload_match_game', data=data, files=files)
+        response = session.post(config.SERVER_URL + '/upload_match_game', data=data, files=files)
     except:
         raise Exception
     finally:
@@ -75,6 +97,7 @@ def upload_match_game(username, password, match_file_path, match_game_id, result
 
 def upload_training_game(username, password, training_game_sgf_path, training_example_path,
                          training_run_id, network_id):
+    session = prepare_session()
     data = {
         'training_run_id': training_run_id,
         'network_id': network_id,
