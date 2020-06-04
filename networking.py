@@ -3,6 +3,7 @@ import config
 from models import NextMatchGame, NextTrainingGame, RequestError
 import pydantic
 import gzip
+import os
 
 
 # TODO сделать так, чтобы не приходилось каждый раз писать обработку ошибки со стороны сервера
@@ -36,11 +37,17 @@ def next_game(username, password):
 
 
 def download_network(sha):
+    # check if cached
+    network_path = config.NETWORKS_FOLDER / (sha + '.h5')
+    if network_path.exists():
+        print(sha, 'is cached up')
+        return
+
     params = {'sha': sha}
 
     try:
         response = requests.get(config.SERVER_URL + '/download_network', json=params)
-        with open(config.NETWORKS_FOLDER / (sha + '.h5'), 'wb') as f:
+        with open(network_path, 'wb') as f:
             f.write(gzip.decompress(response.content))
     except:
         raise Exception
